@@ -1,13 +1,19 @@
-# Security Policy
+## Security Policy
 
-## Supported Versions
+We take security seriously. If you discover any security related issues, please email thomasvincent@[your-domain] instead of using the issue tracker.
 
-We release patches for security vulnerabilities. Which versions are eligible for patches depends on the CVSS v3.0 Rating:
+### Supported Versions
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+| X.X.X   | :white_check_mark: |
+| X.X.X   | :x:                |
 
-## Reporting a Vulnerability
+### Reporting a Vulnerability
 
-Please report security issues to [security@example.com](mailto:security@example.com).
+Please report (suspected) security vulnerabilities to thomasvincent@[your-domain]. You will receive a response from us within [your-response-timeframe]. If the issue is confirmed, we will release a patch as soon as possible depending on complexity but historically within [your-patch-timeframe].
+
+### Additional Security Considerations
+[Add language or framework-specific OWASP Top 10 guidance here]
+
+[If applicable, add information about your bug bounty program here]

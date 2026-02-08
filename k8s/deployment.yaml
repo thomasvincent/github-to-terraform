@@ -1,0 +1,259 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: github-terraform
+---
+# Secrets managed via External Secrets Operator - see README
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: github-terraform-config
+  namespace: github-terraform
+data:
+  GITHUB_USERNAME: "your_github_username"
+  TFE_ORG: "your_terraform_org"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  REDIS_URL: "redis://redis-service:6379/0"
+  IMPORT_BATCH_SIZE: "50"
+  MONITORING_ENABLED: "true"
+  PROMETHEUS_PORT: "8000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-to-terraform
+  namespace: github-terraform
+  labels:
+    app: github-to-terraform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: github-to-terraform
+  template:
+    metadata:
+      labels:
+        app: github-to-terraform
+    spec:
+      serviceAccountName: github-terraform-sa
+      containers:
+      - name: app
+        image: github-to-terraform:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: metrics
+        env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-terraform-secrets
+              key: github-token
+        - name: TFE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-terraform-secrets
+              key: tfe-token
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: github-terraform-secrets
+              key: encryption-key
+        envFrom:
+        - configMapRef:
+            name: github-terraform-config
+        volumeMounts:
+        - name: terraform-data
+          mountPath: /app/terraform
+        - name: logs
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: terraform-data
+        persistentVolumeClaim:
+          claimName: terraform-pvc
+      - name: logs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: github-terraform-service
+  namespace: github-terraform
+  labels:
+    app: github-to-terraform
+spec:
+  type: ClusterIP
+  selector:
+    app: github-to-terraform
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: github-terraform
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        command:
+        - redis-server
+        - --appendonly
+        - "yes"
+        - --maxmemory
+        - "256mb"
+        - --maxmemory-policy
+        - "allkeys-lru"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: github-terraform
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: terraform-pvc
+  namespace: github-terraform
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: github-terraform
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: github-terraform-sa
+  namespace: github-terraform
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: github-terraform-sync
+  namespace: github-terraform
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: github-terraform-sa
+          containers:
+          - name: sync
+            image: github-to-terraform:latest
+            command:
+            - github-to-terraform
+            - import-resources
+            env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-terraform-secrets
+                  key: github-token
+            - name: TFE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-terraform-secrets
+                  key: tfe-token
+            envFrom:
+            - configMapRef:
+                name: github-terraform-config
+            volumeMounts:
+            - name: terraform-data
+              mountPath: /app/terraform
+          volumes:
+          - name: terraform-data
+            persistentVolumeClaim:
+              claimName: terraform-pvc
+          restartPolicy: OnFailure
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: github-terraform-monitor
+  namespace: github-terraform
+spec:
+  selector:
+    matchLabels:
+      app: github-to-terraform
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

@@ -1,0 +1,73 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: github-to-terraform:latest
+    container_name: github-to-terraform
+    environment:
+      - GITHUB_USERNAME=${GITHUB_USERNAME}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - TFE_ORG=${TFE_ORG}
+      - TFE_TOKEN=${TFE_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./terraform:/app/terraform
+      - ./logs:/app/logs
+      - ./config:/app/config
+      - terraform-cache:/root/.terraform.d
+    ports:
+      - "8000:8000"  # Prometheus metrics
+    depends_on:
+      - redis
+    networks:
+      - github-terraform-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass $${REDIS_PASSWORD:-changeme}
+    networks:
+      - github-terraform-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Include only if you need metrics visualization
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    networks:
+      - github-terraform-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  terraform-cache:
+  redis-data:
+  prometheus-data:
+
+networks:
+  github-terraform-network:
+    driver: bridge

@@ -1,15 +1,37 @@
+# Node
 node_modules/
+
+# Environment and secrets
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+
+# Terraform
 *.tfstate
 *.tfstate.backup
 .terraform/
 .terraform.lock.hcl
-*.pem
-*.key
+
+# Logs
 logs/
+
+# Python
 __pycache__/
 *.pyc
+
+# Build
 dist/
 coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

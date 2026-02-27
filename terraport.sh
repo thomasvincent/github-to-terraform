@@ -2,22 +2,22 @@
 
 # Function to check if a command succeeded
 check_command() {
-  if [ $? -ne 0 ]; then
-    echo "Error: $1 failed."
-    exit 1
-  fi
+	if [ $? -ne 0 ]; then
+		echo "Error: $1 failed."
+		exit 1
+	fi
 }
 
 # Function to check if a variable is set
 check_variable() {
-  if [ -z "$1" ]; then
-    echo "Error: Required environment variable $2 is not set."
-    exit 1
-  fi
+	if [ -z "$1" ]; then
+		echo "Error: Required environment variable $2 is not set."
+		exit 1
+	fi
 }
 
 # Ensure GitHub CLI is authenticated
-gh auth status > /dev/null 2>&1
+gh auth status >/dev/null 2>&1
 check_command "GitHub CLI authentication check"
 
 # Check if the required environment variables are set
@@ -27,7 +27,7 @@ check_variable "$TFE_TOKEN" "TFE_TOKEN"
 check_variable "$TFE_ORG" "TFE_ORG"
 
 # Set up the Terraform Cloud configuration
-cat <<EOF > main.tf
+cat <<EOF >main.tf
 terraform {
   cloud {
     organization = "$TFE_ORG"
@@ -49,10 +49,10 @@ check_command "Terraform initialization"
 
 # Function to generate Terraform import statements
 generate_import_statements() {
-  local repo=$1
-  local username=$2
+	local repo=$1
+	local username=$2
 
-  cat <<EOF
+	cat <<EOF
 terraform import github_repository.$repo $username/$repo
 terraform import github_branch.$repo $username/$repo:main
 terraform import github_branch_default.$repo $username/$repo:main
@@ -79,42 +79,42 @@ EOF
 
 # List of repositories
 repos=(
-  "github-to-terraform"
-  "terraform-cloudflare-maintenance"
-  "dotfiles-personal"
-  "performance-optimization-scripts"
-  "personal-portfolio"
-  "pagerduty-python-client"
-  "chef-zabbix-cookbook"
-  "docker-wordpress-swarm-setup"
-  "utility-scripts-collection"
-  "snmp-bind9-statistics"
-  "cloudflare-ufw-sync"
-  "Spring4Shell-resources"
-  "commitkit-rust"
-  "relenz-infrastructure"
-  "python-network-discovery-tool"
-  "terraform-config"
-  "terraform-aws-dedicated-host-"
-  "macos-jira-github-integration-shortcut"
-  "jenkins-script-library"
-  "github-community-standards"
-  "confd"
-  "chef-snmp-cookbook"
-  "atlas-management-system"
-  "zenoss-puppet-module"
-  "terraform-kubernetes-installer"
-  "serverless-jenkins-on-aws-fargate"
-  "personal-blog-site"
-  "payeezy-integration-tests"
-  "pausatf-main-repo"
-  "oracle-inventory-management-tool"
+	"github-to-terraform"
+	"terraform-cloudflare-maintenance"
+	"dotfiles-personal"
+	"performance-optimization-scripts"
+	"personal-portfolio"
+	"pagerduty-python-client"
+	"chef-zabbix-cookbook"
+	"docker-wordpress-swarm-setup"
+	"utility-scripts-collection"
+	"snmp-bind9-statistics"
+	"cloudflare-ufw-sync"
+	"Spring4Shell-resources"
+	"commitkit-rust"
+	"relenz-infrastructure"
+	"python-network-discovery-tool"
+	"terraform-config"
+	"terraform-aws-dedicated-host-"
+	"macos-jira-github-integration-shortcut"
+	"jenkins-script-library"
+	"github-community-standards"
+	"confd"
+	"chef-snmp-cookbook"
+	"atlas-management-system"
+	"zenoss-puppet-module"
+	"terraform-kubernetes-installer"
+	"serverless-jenkins-on-aws-fargate"
+	"personal-blog-site"
+	"payeezy-integration-tests"
+	"pausatf-main-repo"
+	"oracle-inventory-management-tool"
 )
 
 # Generate import statements for each repository
 for repo in "${repos[@]}"; do
-  generate_import_statements $repo $GITHUB_USERNAME
-done > import.sh
+	generate_import_statements $repo $GITHUB_USERNAME
+done >import.sh
 
 # Make the import script executable
 chmod +x import.sh
